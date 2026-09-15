@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+langchain
+langchain-community
+langchain-ollama
+langchain-chroma
+langchain-huggingface
+chromadb
+sentence-transformers
+PyMuPDF
+python-multipart
+sqlalchemy
+pydantic
+pydantic-settings

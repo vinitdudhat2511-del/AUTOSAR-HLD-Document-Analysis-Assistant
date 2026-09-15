@@ -1,0 +1,33 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Databases & Vector Stores (Transient / Runtime State)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+autosar_assistant.db*
+backend/autosar_assistant.db*
+chroma_db/
+backend/chroma_db/
+
+# Uploaded Files & Temporary Processing Artifacts
+uploads/
+backend/uploads/
+*.log
+*.zip
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+*.swp
