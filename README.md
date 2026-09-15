@@ -52,7 +52,6 @@ The platform combines **evidence-grounded Retrieval-Augmented Generation (RAG)**
 ## 📁 Repository Structure
 
 ```
-├── AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf   # Reference AUTOSAR specification
 ├── docker-compose.yml                            # Multi-container orchestration
 ├── .gitignore
 ├── README.md
