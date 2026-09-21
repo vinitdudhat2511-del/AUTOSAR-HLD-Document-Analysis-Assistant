@@ -162,6 +162,3 @@ python backend/test_security.py
 
 ---
 
-## 📄 License & Governance Notice
-
-AI-generated architecture extraction and analysis must be verified by an authorized system architect before being utilized for ISO 26262 compliance, vehicle safety sign-off, or production code generation.
