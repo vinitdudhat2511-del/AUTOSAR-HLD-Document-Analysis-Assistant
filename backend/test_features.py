@@ -27,8 +27,14 @@ def run_feature_tests():
     print("[PASS] Architect authentication: OK")
 
     # 2. Upload test PDF and verify ingestion + genuine extraction
-    pdf_path = "AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf"
-    if os.path.exists(pdf_path):
+    active_doc_id = None
+    candidates = [
+        "AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf",
+        "backend/uploads/AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf",
+        os.path.join(os.path.dirname(__file__), "uploads", "AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf")
+    ]
+    pdf_path = next((p for p in candidates if os.path.exists(p)), None)
+    if pdf_path:
         with open(pdf_path, "rb") as f:
             pdf_bytes = f.read()
         res = client.post(

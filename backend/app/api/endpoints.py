@@ -310,6 +310,32 @@ async def get_document_status(
         "upload_time": doc.upload_time
     }
 
+@router.get("/documents")
+async def list_documents(
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all ingested documents for a project."""
+    if not check_project_access(current_user, project_id):
+        raise HTTPException(status_code=403, detail="Project access denied")
+    docs = db.query(Document).filter(
+        Document.project_id == project_id
+    ).order_by(Document.upload_time.desc()).all()
+    return [
+        {
+            "doc_id": d.doc_id,
+            "filename": d.filename,
+            "version": d.version,
+            "status": d.status,
+            "page_count": d.page_count,
+            "chunk_count": d.chunk_count,
+            "uploaded_by": d.uploaded_by,
+            "upload_time": str(d.upload_time)
+        }
+        for d in docs
+    ]
+
 # --- Architecture Search & Q&A ---
 
 @router.post("/query", response_model=QueryResponse)

@@ -5,7 +5,7 @@ import json
 import time
 import pandas as pd
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000/api/v1")
 HEALTH_URL = API_BASE_URL.replace("/api/v1", "/health")
 
 st.set_page_config(
@@ -72,15 +72,26 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 def check_backend_health():
-    """Live check against backend /health endpoint."""
+    """Live check against backend /health endpoint with host fallback and resilient timeout."""
     try:
-        r = requests.get(HEALTH_URL, timeout=2)
+        r = requests.get(HEALTH_URL, timeout=5)
         if r.status_code == 200:
             info = r.json()
             return True, f"Online (v{info.get('version', '1.0')} | {info.get('llm_model', 'llama3')})"
-        return False, "Unhealthy"
     except Exception:
-        return False, "Offline"
+        pass
+    
+    # Try alternate hostname (localhost <-> 127.0.0.1)
+    try:
+        alt_url = HEALTH_URL.replace("127.0.0.1", "localhost") if "127.0.0.1" in HEALTH_URL else HEALTH_URL.replace("localhost", "127.0.0.1")
+        r = requests.get(alt_url, timeout=5)
+        if r.status_code == 200:
+            info = r.json()
+            return True, f"Online (v{info.get('version', '1.0')} | {info.get('llm_model', 'llama3')})"
+    except Exception:
+        pass
+        
+    return False, "Offline"
 
 def get_auth_headers():
     if st.session_state.auth_token:
@@ -201,9 +212,23 @@ def fetch_inventory(project_id):
     except Exception:
         return None
 
-def fetch_comparison(project_id):
+def fetch_documents(project_id):
     try:
-        res = requests.post(f"{API_BASE_URL}/architecture/compare", headers=get_auth_headers(), json={"project_id": project_id}, timeout=15)
+        res = requests.get(f"{API_BASE_URL}/documents?project_id={project_id}", headers=get_auth_headers(), timeout=10)
+        if res.status_code == 200:
+            return res.json()
+        return []
+    except Exception:
+        return []
+
+def fetch_comparison(project_id, doc_id_base=None, doc_id_target=None):
+    try:
+        payload = {"project_id": project_id}
+        if doc_id_base:
+            payload["doc_id_base"] = doc_id_base
+        if doc_id_target:
+            payload["doc_id_target"] = doc_id_target
+        res = requests.post(f"{API_BASE_URL}/architecture/compare", headers=get_auth_headers(), json=payload, timeout=25)
         if res.status_code == 200:
             return res.json()
         return None
@@ -457,22 +482,94 @@ with tab_inv:
 # --- TAB 3: REVISION COMPARISON & INCONSISTENCIES ---
 with tab_diff:
     st.subheader("🔍 Revision Comparison & Inconsistency Analysis")
-    st.markdown("Detect architectural mismatches, missing BSW services, and unconnected required ports.")
+    st.markdown("Compare architecture across document revisions or specifications to detect added/removed SWCs, mutated interfaces, and architectural gaps.")
     
-    comp_report = fetch_comparison(active_proj)
-    if comp_report:
-        st.success(f"**Baseline**: {comp_report['base_document']} ➔ **Target**: {comp_report['target_document']}")
-        st.info(comp_report["summary"])
+    docs_list = fetch_documents(active_proj)
+    
+    selected_base_id = None
+    selected_target_id = None
+    
+    if docs_list:
+        doc_options = {
+            f"📄 {d['filename']} (v{d['version']}) — [{d['doc_id'][:8]}]": d['doc_id']
+            for d in docs_list
+        }
+        option_labels = list(doc_options.keys())
         
-        st.markdown("#### ⚠️ Architectural Inconsistency Findings")
-        for item in comp_report.get("inconsistencies", []):
-            sev = item["severity"]
-            sev_icon = "🔴" if sev == "ERROR" else ("🟡" if sev == "WARNING" else "🔵")
-            with st.expander(f"{sev_icon} [{sev}] {item['category']}: {item['component_or_interface']}", expanded=True):
-                st.markdown(f"**Description**: {item['description']}")
-                st.markdown(f"**Actionable Engineering Recommendation**: `{item['recommendation']}`")
+        st.markdown("##### ⚙️ Select Document Revisions to Compare")
+        col_b, col_t = st.columns(2)
+        
+        # Default base to second most recent (or first), target to most recent
+        default_base_idx = min(1, len(option_labels) - 1) if len(option_labels) >= 2 else 0
+        default_target_idx = 0
+        
+        with col_b:
+            base_choice = st.selectbox(
+                "📌 Baseline / Reference Document",
+                options=option_labels,
+                index=default_base_idx,
+                help="Select the reference baseline revision (e.g. v1.0, older HLD spec)"
+            )
+            selected_base_id = doc_options[base_choice]
+            
+        with col_t:
+            target_choice = st.selectbox(
+                "🎯 Target / New Revision",
+                options=option_labels,
+                index=default_target_idx,
+                help="Select the new target revision to evaluate against the baseline (e.g. v2.0, updated spec)"
+            )
+            selected_target_id = doc_options[target_choice]
+            
+        if len(docs_list) == 1:
+            st.info("ℹ️ Only 1 document is ingested in this project. Comparing this document against itself runs an internal architectural completeness and orphaned-dependency audit. Ingest another revision or specification to perform a cross-revision delta analysis.")
     else:
-        st.info("Run an ingestion to trigger automatic comparative checks.")
+        st.info("No documents found in this project. Ingest HLD PDFs from the sidebar to enable revision comparison.")
+
+    # Run comparison using selected base and target IDs
+    if selected_base_id and selected_target_id:
+        comp_report = fetch_comparison(active_proj, doc_id_base=selected_base_id, doc_id_target=selected_target_id)
+        if comp_report:
+            st.markdown("---")
+            st.success(f"**Baseline**: `{comp_report['base_document']}` ➔ **Target**: `{comp_report['target_document']}`")
+            st.info(comp_report["summary"])
+            
+            # Delta metrics cards
+            d1, d2, d3, d4 = st.columns(4)
+            with d1:
+                st.metric("Added SWCs", len(comp_report.get("added_components", [])))
+            with d2:
+                st.metric("Removed SWCs", len(comp_report.get("removed_components", [])))
+            with d3:
+                st.metric("Modified Interfaces", len(comp_report.get("modified_interfaces", [])))
+            with d4:
+                st.metric("Total Findings", len(comp_report.get("inconsistencies", [])))
+                
+            # If there are added/removed/modified elements, display them nicely
+            if comp_report.get("added_components") or comp_report.get("removed_components") or comp_report.get("modified_interfaces"):
+                with st.expander("📋 Detailed Revision Delta Matrix", expanded=True):
+                    if comp_report.get("added_components"):
+                        st.markdown("**🟢 Added Components in Target:**")
+                        st.write(", ".join([f"`{c}`" for c in comp_report["added_components"]]))
+                    if comp_report.get("removed_components"):
+                        st.markdown("**🔴 Removed Components from Baseline:**")
+                        st.write(", ".join([f"`{c}`" for c in comp_report["removed_components"]]))
+                    if comp_report.get("modified_interfaces"):
+                        st.markdown("**🟡 Modified Interface Contracts:**")
+                        st.write(", ".join([f"`{i}`" for i in comp_report["modified_interfaces"]]))
+            
+            st.markdown("#### ⚠️ Architectural Inconsistency Findings & Alerts")
+            if comp_report.get("inconsistencies"):
+                for item in comp_report.get("inconsistencies", []):
+                    sev = item["severity"]
+                    sev_icon = "🔴" if sev == "ERROR" else ("🟡" if sev == "WARNING" else "🔵")
+                    with st.expander(f"{sev_icon} [{sev}] {item['category']}: {item['component_or_interface']}", expanded=True):
+                        st.markdown(f"**Description**: {item['description']}")
+                        st.markdown(f"**Actionable Engineering Recommendation**: `{item['recommendation']}`")
+            else:
+                st.success("✅ No architectural inconsistencies, breaking changes, or orphaned dependencies detected between these revisions.")
+        else:
+            st.warning("Could not compute revision comparison report for the selected documents.")
 
 # --- TAB 4: STRUCTURED EXPORT ---
 with tab_export:
