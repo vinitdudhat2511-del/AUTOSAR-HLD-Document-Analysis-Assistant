@@ -91,7 +91,7 @@ def check_backend_health():
     except Exception:
         pass
         
-    return False, "Offline"
+    return "AUTOSAR Assistant is under maintenance"
 
 def get_auth_headers():
     if st.session_state.auth_token:
