@@ -15,7 +15,7 @@ from app.database import (
 client = TestClient(app)
 
 def run_feature_tests():
-    print("=" * 60)
+    print("=" * 600)
     print("RUNNING EXTENSIVE ARCHITECTURE & DIFF VALIDATION TESTS")
     print("=" * 60)
 
