@@ -91,7 +91,7 @@ def check_backend_health():
     except Exception:
         pass
         
-    return False, "Offline"
+    return False, "Online"
 
 def get_auth_headers():
     if st.session_state.auth_token:
