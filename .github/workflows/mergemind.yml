@@ -1,0 +1,58 @@
+name: MergeMind AutoML Conflict Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  mergemind-check:
+    name: Analyze merge conflicts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out AutoML repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MergeMind
+        run: python -m pip install "git+https://github.com/SaaranshJohri/Autonomous-Multi-Agent-Merge-Auditor-Execution-Sequence-Verifier.git"
+
+      - name: Fetch pull request commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch origin "$BASE_BRANCH"
+          git fetch origin "$HEAD_SHA"
+
+      - name: Analyze pull request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mergemind check \
+            --base "origin/$BASE_BRANCH" \
+            --head "$HEAD_SHA" \
+            --fail-on-conflict
+
+      - name: Analyze main branch manually
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git fetch origin
+          mergemind check \
+            --base origin/main \
+            --head HEAD \
+            --fail-on-conflict
