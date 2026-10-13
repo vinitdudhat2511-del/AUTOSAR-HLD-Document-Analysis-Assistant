@@ -15,7 +15,7 @@ from app.database import (
 client = TestClient(app)
 
 def run_feature_tests():
-    print("=" * 600)
+    print("=" * 60)
     print("RUNNING EXTENSIVE ARCHITECTURE & DIFF VALIDATION TESTS")
     print("=" * 60)
 
@@ -87,7 +87,7 @@ def run_feature_tests():
 
         # Re-upload 3rd time (simulating repeated revisions)
         res_dup3 = client.post(
-            "/api/v1/upload",
+            "/api/upload",
             headers=headers,
             files={"file": ("AUTOSAR_EXP_LayeredSoftwareArchitecture.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
             data={"project_id": "AUTOSAR_Classic_BSW", "version": "4.4.2"}
