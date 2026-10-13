@@ -1,4 +1,4 @@
-name: MergeMind AutoML Conflict Check
+name: MergeMind AutoSAR Conflict Check
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out AutoML repository
+      - name: Check out AutoSAR repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
